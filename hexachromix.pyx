@@ -4,30 +4,10 @@
 import re
 
 cimport cython
-from libc.string cimport memcpy
 
 
 # Set up some constants.
 COLORS = "RYGCBM"
-
-CHAR2INT = {'-': 0}
-CHAR2INT.update({c:1<<i for i,c in enumerate(COLORS)})
-CHAR2INT.update({c.lower(): CHAR2INT[COLORS[i-1]] | CHAR2INT[COLORS[(i+1)%6]] for i,c in enumerate(COLORS)})
-
-INT2CHAR = {v:k for k,v in CHAR2INT.items()}
-
-cdef int[6][4] COLOR_PLAY_FROM = [[
-    0,
-    CHAR2INT[c.lower()],
-    CHAR2INT[COLORS[(i-2)%6]],
-    CHAR2INT[COLORS[(i+2)%6]],
-] for i,c in enumerate(COLORS)]
-cdef int[6][4] COLOR_PLAY_TO = [[
-    CHAR2INT[c],
-    CHAR2INT[c],
-    CHAR2INT[COLORS[(i-1)%6].lower()],
-    CHAR2INT[COLORS[(i+1)%6].lower()],
-] for i,c in enumerate(COLORS)]
 
 cdef unsigned char[6][4][2] TRANSFORMATIONS = [
     [[ord(c) for c in pair] for pair in group] for group in [
@@ -46,34 +26,31 @@ cdef struct Move:
 
 
 cdef class HexachromixState:
-    cdef int board, player
-    # cdef unsigned char[19] board
-    # cdef unsigned int player
+    cdef unsigned char[19] board
+    cdef unsigned int player
     cdef variant
 
-    def __init__(self, board:int=0, player:int=0, variant:str="MRY", hfen:str=None):
-    # def __init__(self, board:list=None, player:int=0, variant:str="MRY", hfen:str=None):
+    def __init__(self, board:list=None, player:int=0, variant:str="MRY", hfen:str=None):
         if hfen is not None:
             self.load_hfen(hfen)
         else:
-            self.board = board
-            # self.board = board or [ord('-')]*19
+            board = board or [ord('-')]*19
+            for i in range(19):
+                self.board[i] = board[i]
             self.player = player % 6
             self.variant = variant
 
     def load_hfen(self, hfen:str):
         (board, color, variant) = hfen.split(' ')
-        board = re.sub(r'\d', lambda x: '-'*int(x.group(0)), board.replace('/',''))[::-1]
-        board = int(''.join(f'{CHAR2INT[c]:06b}' for c in board), 2)
-        self.board = board
-        # self.board = list(board)
+        board = re.sub(r'\d', lambda x: '-'*int(x.group(0)), board.replace('/',''))
+        for i in range(19):
+            self.board[i] = ord(board[i])
         self.player = COLORS.index(color)
         self.variant = variant
 
     @property
     def hfen(self) -> str:
-        board = [INT2CHAR[get_cell(self.board,i)] for i in range(19)]
-        # board = [self.board[i] for i in range(19)]
+        board = [chr(self.board[i]) for i in range(19)]
         board = '/'.join([''.join(board[i:j]) for i,j in [(0,3), (3,7), (7,12), (12,16), (16,19)]])
         board = re.sub(r'-+', lambda x: str(len(x.group(0))), board)
         return f'{board} {COLORS[self.player]} {self.variant}'
@@ -99,21 +76,9 @@ cdef class HexachromixState:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cpdef get_legal_moves(self):
-        cdef int i, j, cell
-        cdef int[19][2] moves
-        cdef int n = 0
-        # cdef unsigned int i, j, n = 0
-        # cdef unsigned char c
-        # cdef Move[19] moves
-
-        for i in range(19):
-            cell = (self.board >> (6*i)) & 0b111111 # hardcoded get_cell logic to avoid python overhead
-            for j in range(4):
-                if cell == COLOR_PLAY_FROM[self.player][j]:
-                    moves[n] = [i, COLOR_PLAY_TO[self.player][j]]
-                    n += 1
-                    break
-        '''
+        cdef unsigned int i, j, n = 0
+        cdef unsigned char c
+        cdef Move[19] moves
         for i in range(19):
             c = self.board[i]
             for j in range(4):
@@ -123,24 +88,15 @@ cdef class HexachromixState:
                     n += 1
                     break
         return [(moves[i].i, moves[i].c) for i in range(n)]
-        '''
-
-        return [(moves[i][0], moves[i][1]) for i in range(n)]
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cpdef HexachromixState make_move(self, (int,int) move):
-        cdef int i = move[0], x = move[1]
-        cdef int board = (self.board & ~(0b111111 << (6*i))) | (x << (6*i)) # hardcoded set_cell logic to avoid python overhead
-        return HexachromixState(board, self.player+1, self.variant)
-        '''
         cdef unsigned int i = move[0]
         cdef unsigned char c = move[1]
-        cdef unsigned char[19] board
-        memcpy(board, self.board, 19)
+        board = [self.board[i] for i in range(19)]
         board[i] = c
         return HexachromixState(board, self.player+1, self.variant)
-        '''
 
     cpdef bint is_terminal(self):
         return self.has_path() or len(self.get_legal_moves()) == 0
@@ -157,12 +113,6 @@ cdef class HexachromixState:
         return COLORS[(self.player-1)%6]
 
     def __repr__(self): return self.hfen
-
-
-cdef int get_cell(int board, int i):
-    return (board >> (6*i)) & 0b111111
-cdef int set_cell(int board, int i, int x):
-    return (board & ~(0b111111 << (6*i))) | (x << (6*i))
 
 
 """
@@ -205,15 +155,13 @@ cdef unsigned int[6][2][3] SIDES = [
     [[11,15,18], [0,3,7]],
 ]
 
-cdef int[6][3] OCCUPANTS = [[CHAR2INT[c] for c in chars] for chars in ['mRy','rYg','yGc','gCb','cBm','bMr']]
-# cdef unsigned char[6][3] OCCUPANTS = [[ord(c) for c in chars] for chars in ['mRy','rYg','yGc','gCb','cBm','bMr']]
+cdef unsigned char[6][3] OCCUPANTS = [[ord(c) for c in chars] for chars in ['mRy','rYg','yGc','gCb','cBm','bMr']]
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef bint bfs(int color_idx, int board):
-    cdef int neighbor, idx, i, j
-    # cdef int neighbor
-    # cdef unsigned int idx, i, j
+cdef bint bfs(unsigned int color_idx, unsigned char[19] board):
+    cdef int neighbor
+    cdef unsigned int idx, i, j
     cdef bint does_occupy
     cdef unsigned int[3] ends = SIDES[color_idx][1]
     cdef bint[19] visited = [False] * 19
@@ -231,8 +179,7 @@ cdef bint bfs(int color_idx, int board):
         # If the color doesn't occupy this cell, skip it.
         does_occupy = False
         for i in range(3):
-            if OCCUPANTS[color_idx][i] == ((board >> (6*idx)) & 0b111111): # hardcoded get_cell logic to avoid python overhead
-            # if OCCUPANTS[color_idx][i] == board[idx]:
+            if OCCUPANTS[color_idx][i] == board[idx]:
                 does_occupy = True
                 break
         if not does_occupy:
