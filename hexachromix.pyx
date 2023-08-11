@@ -25,61 +25,63 @@ CHAR2INT = {c:i for i,c in enumerate(INT2CHAR)}
 
 
 cdef class HexachromixState:
-    cdef unsigned long board
-    cdef unsigned int player
+    cdef unsigned int[3] board
+    cdef unsigned int _player
     cdef variant
 
-    def __init__(self, board:int=0, player:int=0, variant:str="MRY", hfen:str=None):
+    def __init__(self, board:[int,int,int]=None, player:int=0, variant:str="MRY", hfen:str=None):
         if hfen is not None:
-            self.load_hfen(hfen)
-        else:
-            self.board = board
-            self.player = player
-            self.variant = variant
+            (board, color, variant) = hfen.split(' ')
+            player = COLORS.index(color)
+            # Replace ints with dashes, strip slashes, and reverse.
+            board = re.sub(r'\d', lambda x: '-'*int(x.group(0)), board.replace('/',''))[::-1]
+            board = [f'{CHAR2INT[c]:04b}' for c in board]
+            board = [int(''.join(board[i:j]),2) for i,j in ((0,8),(8,16),(16,19))]
 
-    def load_hfen(self, hfen:str):
-        (board, color, variant) = hfen.split(' ')
-        # Replace ints with dashes and strip slashes.
-        board = re.sub(r'\d', lambda x: '-'*int(x.group(0)), board.replace('/',''))
-        # Reverse and convert to binary string.
-        board = ''.join(f'{CHAR2INT[c]:04b}' for c in board[::-1])
-        self.board = int(board,2)
-        self.player = COLORS.index(color)
+        if board is None: board = [0,0,0]
+
+        for i in range(3):
+            self.board[i] = board[i]
+        self._player = player
         self.variant = variant
 
     @property
     def hfen(self) -> str:
-        board = [INT2CHAR[(self.board >> (4*i)) & 0b1111] for i in range(19)] # hardcoded get_cell logic to avoid python overhead
+        board = [INT2CHAR[get_cell(self.board,i)] for i in range(19)]
         board = '/'.join([''.join(board[i:j]) for i,j in [(0,3), (3,7), (7,12), (12,16), (16,19)]])
         board = re.sub(r'-+', lambda x: str(len(x.group(0))), board)
-        return f'{board} {COLORS[self.player]} {self.variant}'
+        return f'{board} {self.player} {self.variant}'
+
+    @property
+    def player(self): return COLORS[self._player]
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cpdef get_current_team(self):
         if self.variant == "MRY":
-            if self.player in [5,0,1]:
+            if self._player in [5,0,1]:
                 return "MRY"
             else:
                 return "GCB"
         elif self.variant == "MR":
-            if self.player in [5,0]:
+            if self._player in [5,0]:
                 return "MR"
-            elif self.player in [1,2]:
+            elif self._player in [1,2]:
                 return "YG"
             else:
                 return "CB"
         else:
-            return COLORS[self.player]
+            return COLORS[self._player]
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cpdef get_legal_moves(self):
-        cdef unsigned int i, x, y, n = 0
+        cdef unsigned int i, x, n = 0
+        cdef int y
         cdef unsigned int[19][2] moves
         for i in range(19):
-            x = (self.board >> (4*i)) & 0b1111 # hardcoded get_cell logic to avoid python overhead
-            y = TRANSFORMATIONS[self.player][x]
+            x = get_cell(self.board, i)
+            y = TRANSFORMATIONS[self._player][x]
             if y != -1:
                 moves[n] = [i,y]
                 n += 1
@@ -89,8 +91,11 @@ cdef class HexachromixState:
     @cython.wraparound(False)
     cpdef HexachromixState make_move(self, move):
         cdef unsigned int i = move[0], x = move[1]
-        cdef unsigned long board = (self.board & ~(0b1111 << (4*i))) | (x << (4*i)) # hardcoded set_cell logic to avoid python overhead
-        return HexachromixState(board, (self.player+1)%6, self.variant)
+        cdef unsigned int[3] board
+        cdef unsigned int[:] vboard = board
+        for i in range(3): board[i] = self.board[i]
+        set_cell(vboard, i, x)
+        return HexachromixState(board, (self._player+1)%6, self.variant)
 
     cpdef bint is_terminal(self):
         return self.has_path() or len(self.get_legal_moves()) == 0
@@ -99,14 +104,38 @@ cdef class HexachromixState:
         return 1 if self.has_path() else 0
 
     cdef bint has_path(self):
-        return bfs((self.player-1)%6, self.board)
+        return bfs((self._player-1)%6, self.board)
 
     def get_result(self):
         if not self.is_terminal(): return None
         if self.get_reward() == 0: return 'DRAW'
-        return COLORS[(self.player-1)%6]
+        return COLORS[(self._player-1)%6]
 
     def __repr__(self): return self.hfen
+
+
+cdef unsigned int get_cell(unsigned int[3] board, unsigned int i):
+    cdef unsigned int j
+    if i < 8:
+        j = 0
+    elif i < 16:
+        j = 1
+        i -= 8
+    else:
+        j = 2
+        i -= 16
+    return board[j] >> (4*i) & 0b1111
+cdef void set_cell(unsigned int[:] board, unsigned int i, unsigned int x):
+    cdef unsigned int j
+    if i < 8:
+        j = 0
+    elif i < 16:
+        j = 1
+        i -= 8
+    else:
+        j = 2
+        i -= 16
+    board[j] = (board[j] & ~(0b1111 << (4*i))) | (x << (4*i))
 
 
 """
@@ -153,7 +182,7 @@ cdef unsigned int[6][3] OCCUPANTS = [[CHAR2INT[c] for c in chars] for chars in [
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef bint bfs(unsigned int color_idx, unsigned long board):
+cdef bint bfs(unsigned int color_idx, unsigned int[3] board):
     cdef int neighbor
     cdef unsigned int idx, i, j
     cdef bint does_occupy
@@ -173,7 +202,7 @@ cdef bint bfs(unsigned int color_idx, unsigned long board):
         # If the color doesn't occupy this cell, skip it.
         does_occupy = False
         for i in range(3):
-            if OCCUPANTS[color_idx][i] == ((board >> (4*idx)) & 0b1111): # hardcoded get_cell logic to avoid python overhead
+            if OCCUPANTS[color_idx][i] == get_cell(board, idx):
                 does_occupy = True
                 break
         if not does_occupy:
