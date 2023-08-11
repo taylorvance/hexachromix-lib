@@ -9,7 +9,7 @@ cimport cython
 # Set up some constants.
 COLORS = "RYGCBM"
 
-cdef int[6][13] TRANSFORMATIONS = [
+cdef char[6][13] TRANSFORMATIONS = [
     #0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12
     #-, R, Y, G, C, B, M, r, y, g, c, b, m
     [1,-1,-1, 8,-1,12,-1, 1,-1,-1,-1,-1,-1],
@@ -25,35 +25,35 @@ CHAR2INT = {c:i for i,c in enumerate(INT2CHAR)}
 
 
 cdef class HexachromixState:
-    cdef unsigned int[3] board
-    cdef unsigned int _player
+    cdef char[19] board
+    cdef char _player
     cdef variant
 
-    def __init__(self, board:[int,int,int]=None, player:int=0, variant:str="MRY", hfen:str=None):
+    def __init__(self, board:list=[0]*19, player:int=0, variant:str='MRY', hfen:str=None):
         if hfen is not None:
-            (board, color, variant) = hfen.split(' ')
-            player = COLORS.index(color)
+            (boardstr, color, variant) = hfen.split(' ')
             # Replace ints with dashes, strip slashes, and reverse.
-            board = re.sub(r'\d', lambda x: '-'*int(x.group(0)), board.replace('/',''))[::-1]
-            board = [f'{CHAR2INT[c]:04b}' for c in board]
-            board = [int(''.join(board[i:j]),2) for i,j in ((0,8),(8,16),(16,19))]
+            boardstr = re.sub(
+                r'\d',
+                lambda x: '-'*int(x.group(0)),
+                boardstr.replace('/','')
+            )
+            board = [CHAR2INT[c] for c in boardstr]
+            player = COLORS.index(color)
 
-        if board is None: board = [0,0,0]
-
-        for i in range(3):
-            self.board[i] = board[i]
+        for i in range(19): self.board[i] = board[i]
         self._player = player
         self.variant = variant
 
     @property
     def hfen(self) -> str:
-        board = [INT2CHAR[get_cell(self.board,i)] for i in range(19)]
+        board = [INT2CHAR[self.board[i]] for i in range(19)]
         board = '/'.join([''.join(board[i:j]) for i,j in [(0,3), (3,7), (7,12), (12,16), (16,19)]])
         board = re.sub(r'-+', lambda x: str(len(x.group(0))), board)
         return f'{board} {self.player} {self.variant}'
 
     @property
-    def player(self): return COLORS[self._player]
+    def player(self) -> str: return COLORS[self._player]
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -71,36 +71,32 @@ cdef class HexachromixState:
             else:
                 return "CB"
         else:
-            return COLORS[self._player]
+            return self.player
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cpdef get_legal_moves(self):
-        cdef unsigned int i, x, n = 0
-        cdef int y
-        cdef unsigned int[19][2] moves
+        cdef char i, x, n = 0
+        cdef char[19][2] moves
         for i in range(19):
-            x = get_cell(self.board, i)
-            y = TRANSFORMATIONS[self._player][x]
-            if y != -1:
-                moves[n] = [i,y]
+            x = TRANSFORMATIONS[self._player][self.board[i]]
+            if x != -1:
+                moves[n] = [i,x]
                 n += 1
         return [(moves[i][0],moves[i][1]) for i in range(n)]
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cpdef HexachromixState make_move(self, move):
-        cdef unsigned int i = move[0], x = move[1]
-        cdef unsigned int[3] board
-        cdef unsigned int[:] vboard = board
-        for i in range(3): board[i] = self.board[i]
-        set_cell(vboard, i, x)
+    cpdef HexachromixState make_move(self, (int,int) move):
+        cdef char i = move[0], c = move[1]
+        board = [self.board[i] for i in range(19)]
+        board[i] = c
         return HexachromixState(board, (self._player+1)%6, self.variant)
 
     cpdef bint is_terminal(self):
         return self.has_path() or len(self.get_legal_moves()) == 0
 
-    cpdef int get_reward(self):
+    cpdef get_reward(self):
         return 1 if self.has_path() else 0
 
     cdef bint has_path(self):
@@ -114,30 +110,6 @@ cdef class HexachromixState:
     def __repr__(self): return self.hfen
 
 
-cdef unsigned int get_cell(unsigned int[3] board, unsigned int i):
-    cdef unsigned int j
-    if i < 8:
-        j = 0
-    elif i < 16:
-        j = 1
-        i -= 8
-    else:
-        j = 2
-        i -= 16
-    return board[j] >> (4*i) & 0b1111
-cdef void set_cell(unsigned int[:] board, unsigned int i, unsigned int x):
-    cdef unsigned int j
-    if i < 8:
-        j = 0
-    elif i < 16:
-        j = 1
-        i -= 8
-    else:
-        j = 2
-        i -= 16
-    board[j] = (board[j] & ~(0b1111 << (4*i))) | (x << (4*i))
-
-
 """
     -- -- --
   / 0  1  2  \
@@ -147,7 +119,7 @@ cdef void set_cell(unsigned int[:] board, unsigned int i, unsigned int x):
   \ 16 17 18 /
     -- -- --
 """
-cdef int[19][6] ADJACENCIES = [
+cdef char[19][6] ADJACENCIES = [
     [1,3,4,-1],
     [0,2,4,5,-1],
     [1,5,6,-1],
@@ -169,7 +141,7 @@ cdef int[19][6] ADJACENCIES = [
     [14,15,17,-1],
 ]
 
-cdef unsigned int[6][2][3] SIDES = [
+cdef char[6][2][3] SIDES = [
     [[0,1,2], [16,17,18]],
     [[2,6,11], [7,12,16]],
     [[11,15,18], [0,3,7]],
@@ -178,21 +150,20 @@ cdef unsigned int[6][2][3] SIDES = [
     [[11,15,18], [0,3,7]],
 ]
 
-cdef unsigned int[6][3] OCCUPANTS = [[CHAR2INT[c] for c in chars] for chars in ['mRy','rYg','yGc','gCb','cBm','bMr']]
+cdef char[6][3] OCCUPANTS = [[ord(c) for c in chars] for chars in ['mRy','rYg','yGc','gCb','cBm','bMr']]
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef bint bfs(unsigned int color_idx, unsigned int[3] board):
-    cdef int neighbor
-    cdef unsigned int idx, i, j
+cdef bint bfs(char color_idx, char[19] board):
+    cdef char neighbor, idx, i, n = 0
     cdef bint does_occupy
-    cdef unsigned int[3] ends = SIDES[color_idx][1]
+    cdef char[3] ends = SIDES[color_idx][1]
     cdef bint[19] visited = [False] * 19
 
     # Initialize the frontier with the three starting indices.
-    cdef unsigned int[19] frontier
+    cdef char[19] frontier
     (frontier[0],frontier[1],frontier[2]) = SIDES[color_idx][0]
-    cdef unsigned int n = 3
+    n = 3
 
     while n > 0:
         # "Pop" a cell off of the frontier.
@@ -202,7 +173,7 @@ cdef bint bfs(unsigned int color_idx, unsigned int[3] board):
         # If the color doesn't occupy this cell, skip it.
         does_occupy = False
         for i in range(3):
-            if OCCUPANTS[color_idx][i] == get_cell(board, idx):
+            if OCCUPANTS[color_idx][i] == board[idx]:
                 does_occupy = True
                 break
         if not does_occupy:
