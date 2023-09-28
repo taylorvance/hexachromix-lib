@@ -48,6 +48,9 @@ cdef class HexachromixState:
         board = re.sub(r'-+', lambda x: str(len(x.group(0))), board)
         return f'{board} {COLORS[self.player]} {self.variant}'
 
+    @property
+    def color(self) -> str: return COLORS[self.player]
+
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cpdef get_current_team(self):
@@ -69,12 +72,18 @@ cdef class HexachromixState:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cpdef get_legal_moves(self):
-        cdef char i, j, c, n = 0
+        cdef char i, j, k, c, n = 0
         cdef char[19][2] moves
+        cdef char[19] board
         for i in range(19):
             c = self.board[i]
             for j in range(4):
                 if c == TRANSFORMATIONS[self.player][j][0]:
+                    for k in range(19): board[k] = self.board[k]
+                    board[i] = TRANSFORMATIONS[self.player][j][1]
+                    if bfs(self.player, board):
+                        # If this is a winning move, pretend it's the only move. Don't waste time on others.
+                        return [(i, board[i])]
                     moves[n] = [i, TRANSFORMATIONS[self.player][j][1]]
                     n += 1
                     break
@@ -106,13 +115,13 @@ cdef class HexachromixState:
 
 
 """
-    -- -- --
-  / 0  1  2  \
- / 3  4  5  6  \
-| 7  8  9  10 11|
- \ 12 13 14 15 /
-  \ 16 17 18 /
-    -- -- --
+     ——  ——  ——
+   / 0   1   2  \
+ / 3   4   5   6  \
+|7   8   9   10  11|
+ \ 12  13  14  15 /
+   \ 16  17  18 /
+     ——  ——  ——
 """
 cdef char[19][6] ADJACENCIES = [
     [1,3,4,-1],
@@ -192,26 +201,3 @@ cdef bint bfs(char color_idx, char[19] board):
 
     # No path found.
     return False
-
-
-def render_hfen(hfen):
-    CHAR2COLORS = {
-        '-':'-',
-        'R':'R', 'Y':'Y', 'G':'G', 'C':'C', 'B':'B', 'M':'M',
-        'r':'MY', 'y':'RG', 'g':'YC', 'c':'GB', 'b':'CM', 'm':'BR',
-    }
-    board = hfen.split(' ')[0]
-    board = re.sub(r'\d', lambda x: '-'*int(x.group(0)), board).replace('/','')
-    spaces = [''.join(colorize(x,x) for x in CHAR2COLORS[c].ljust(2,'-')) for c in board]
-    out = '    ' + colorize('R', '-- -- --')
-    out += '\n  ' + colorize('M', '/') + ' ' + ' '.join(spaces[:3]) + ' ' + colorize('Y', '\\')
-    out += '\n ' + colorize('M', '/') + ' ' + ' '.join(spaces[3:7]) + ' ' + colorize('Y', '\\')
-    out += '\n| ' + ' '.join(spaces[7:12]) + '|'
-    out += '\n ' + colorize('B', '\\') + ' ' + ' '.join(spaces[12:16]) + ' ' + colorize('G', '/')
-    out += '\n  ' + colorize('B', '\\') + ' ' + ' '.join(spaces[16:]) + ' ' + colorize('G', '/')
-    out += '\n    ' + colorize('C', '-- -- --')
-    return out
-
-def colorize(c, txt):
-    COLORCODES = {'R':'\033[31m', 'Y':'\033[93m', 'G':'\033[32m', 'C':'\033[36m', 'B':'\033[34m', 'M':'\033[35m'}
-    return f'{COLORCODES[c]}{txt}\033[0m' if c in COLORCODES else txt
