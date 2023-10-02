@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from multimcts import MCTS
 
-from .gamestate import HexachromixState
+from .core import HexachromixState
 
 app = FastAPI()
 

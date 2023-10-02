@@ -4,7 +4,7 @@ import resource
 import re
 
 from multimcts import MCTS
-from .gamestate import HexachromixState
+from .core import HexachromixState
 
 
 def main():
@@ -170,13 +170,13 @@ def render_hfen(hfen:str, show_indices:bool=False):
     else:
         spaces = [colorize(SPACEMAP[c]) for c in board]
 
-    out = '     ' + colorize('——  ——  ——','R')
+    out = '   ' + colorize('  __'*3,'R')
     out += '\n   ' + colorize('/','M') + ' ' + '  '.join(spaces[:3]) + ' ' + colorize('\\','Y')
     out += '\n ' + colorize('/','M') + ' ' + '  '.join(spaces[3:7]) + ' ' + colorize('\\','Y')
     out += '\n|' + '  '.join(spaces[7:12]) + '|'
     out += '\n ' + colorize('\\','B') + ' ' + '  '.join(spaces[12:16]) + ' ' + colorize('/','G')
     out += '\n   ' + colorize('\\','B') + ' ' + '  '.join(spaces[16:]) + ' ' + colorize('/','G')
-    out += '\n     ' + colorize('——  ——  ——','C')
+    out += '\n   ' + colorize('  ‾‾'*3,'C')
 
     return out
 

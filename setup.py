@@ -3,7 +3,7 @@ from Cython.Build import cythonize
 
 setup(
     name='hexachromix',
-    version='0.2.0',
+    version='0.2.1',
     description='Hexachromix',
     author='Taylor Vance',
     author_email='mirrors.cities0w@icloud.com',
@@ -18,6 +18,6 @@ setup(
         'console_scripts': ['hexachromix-cli=hexachromix.cli:main'],
     },
     ext_modules=cythonize([
-        Extension('hexachromix.gamestate', ['hexachromix/gamestate.pyx']),
+        Extension('hexachromix.core', ['hexachromix/core.pyx']),
     ]),
 )
