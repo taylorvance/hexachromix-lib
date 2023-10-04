@@ -152,13 +152,13 @@ def colorize(txt:str, c:str=None):
 
 def render_hfen(hfen:str, show_indices:bool=False):
     # Pad right with emdashes.
-    SPACEMAP = {k: v.ljust(2,'—') for k,v in {
+    SPACEMAP = {k:v.ljust(2,'—') for k,v in {
         '-':'',
         'R':'R', 'Y':'Y', 'G':'G', 'C':'C', 'B':'B', 'M':'M',
         'r':'MY', 'y':'RG', 'g':'YC', 'c':'GB', 'b':'CM', 'm':'BR',
     }.items()}
 
-    board = hfen.split(' ')[0]
+    board = hfen.split()[0]
     board = re.sub(r'\d', lambda x: '-'*int(x.group(0)), board).replace('/','')
 
     if show_indices:
@@ -170,15 +170,27 @@ def render_hfen(hfen:str, show_indices:bool=False):
     else:
         spaces = [colorize(SPACEMAP[c]) for c in board]
 
-    out = '   ' + colorize('  __'*3,'R')
-    out += '\n   ' + colorize('/','M') + ' ' + '  '.join(spaces[:3]) + ' ' + colorize('\\','Y')
-    out += '\n ' + colorize('/','M') + ' ' + '  '.join(spaces[3:7]) + ' ' + colorize('\\','Y')
-    out += '\n|' + '  '.join(spaces[7:12]) + '|'
-    out += '\n ' + colorize('\\','B') + ' ' + '  '.join(spaces[12:16]) + ' ' + colorize('/','G')
-    out += '\n   ' + colorize('\\','B') + ' ' + '  '.join(spaces[16:]) + ' ' + colorize('/','G')
-    out += '\n   ' + colorize('  ‾‾'*3,'C')
+    # "join spaces"
+    def js(start,end):
+        return '  '.join(spaces[start:end])
 
-    return out
+    # "border" constants
+    bR = colorize('  __'*3,'R')
+    bY = colorize('\\','Y')
+    bG = colorize('/','G')
+    bC = colorize('  ‾‾'*3,'C')
+    bB = colorize('\\','B')
+    bM = colorize('/','M')
+
+    return '\n'.join([
+        f'   {bR}',
+        f'   {bM} {js(0,3)} {bY}',
+        f' {bM} {js(3,7)} {bY}',
+        f'|{js(7,12)}|',
+        f' {bB} {js(12,16)} {bG}',
+        f'   {bB} {js(16,19)} {bG}',
+        f'   {bC}',
+    ])
 
 
 if __name__ == "__main__":

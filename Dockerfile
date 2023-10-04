@@ -17,3 +17,5 @@ FROM python:3.10-slim
 
 COPY --from=build /usr/local/bin/ /usr/local/bin/
 COPY --from=build /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+
+CMD ["uvicorn", "hexachromix.api:app", "--host", "0.0.0.0", "--port", "80"]

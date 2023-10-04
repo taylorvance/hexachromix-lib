@@ -3,7 +3,7 @@ from Cython.Build import cythonize
 
 setup(
     name='hexachromix',
-    version='0.2.1',
+    version='0.2.2',
     description='Hexachromix',
     author='Taylor Vance',
     author_email='mirrors.cities0w@icloud.com',
@@ -12,6 +12,7 @@ setup(
         'cython<4.0.0',
         'multimcts==0.6.2',
         'fastapi',
+        'uvicorn',
         'psutil',
     ],
     entry_points={

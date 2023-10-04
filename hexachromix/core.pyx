@@ -7,13 +7,29 @@ cimport cython
 
 
 # Set up some constants.
-COLORS = "RYGCBM"
+COLORS = 'RYGCBM'
+
+VARIANT_PLAYER_TEAM = {
+    variant: {
+        c: next(team for team in teams if c in team)
+        for c in COLORS
+    }
+    for variant,teams in {
+        'MRY': ['MRY','GCB'],
+        'MR': ['MR','YG','CB'],
+        'R': ['R','Y','G','C','B','M'],
+    }.items()
+}
 
 INT2CHAR = ['-','R','Y','G','C','B','M','r','y','g','c','b','m']
 CHAR2INT = {c:i for i,c in enumerate(INT2CHAR)}
 
 cdef unsigned char[6][4][2] TRANSFORMATIONS = [
-    [[CHAR2INT[c] for c in pair] for pair in group] for group in [
+    [
+        [CHAR2INT[c] for c in pair]
+        for pair in group
+    ]
+    for group in [
         [['-','R'], ['r','R'], ['G','y'], ['B','m']],
         [['-','Y'], ['y','Y'], ['C','g'], ['M','r']],
         [['-','G'], ['g','G'], ['B','c'], ['R','y']],
@@ -31,8 +47,8 @@ cdef class HexachromixState:
 
     def __init__(self, board:list=[0]*19, player:int=0, variant:str="MRY", hfen:str=None):
         if hfen is not None:
-            (boardstr, color, variant) = hfen.split(' ')
-            # Replace ints with dashes, strip slashes, and reverse.
+            (boardstr, color, variant) = hfen.split()
+            # Strip slashes and replace ints with dashes.
             boardstr = re.sub(r'\d', lambda x: '-'*int(x.group(0)), boardstr.replace('/',''))
             board = [CHAR2INT[c] for c in boardstr]
             player = COLORS.index(color)
@@ -104,9 +120,12 @@ cdef class HexachromixState:
     cpdef bint has_path(self): return bfs((self.player-1)%6, self.board)
 
     def get_result(self):
-        if not self.is_terminal(): return None # Game is not over, so no result yet.
-        if not self.has_path(): return 'DRAW' # Game is over without a path (no legal moves for the current player).
-        return COLORS[(self.player-1)%6] # The previous color made a path from its side to the opposite side.
+        if self.has_path():
+            prev = COLORS[(self.player - 1) % 6]
+            return f'{prev} {VARIANT_PLAYER_TEAM[self.variant][prev]}'
+        if len(self.get_legal_moves()) == 0:
+            return 'DRAW'
+        return None
 
     def __repr__(self): return self.hfen
 
