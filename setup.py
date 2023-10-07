@@ -3,14 +3,14 @@ from Cython.Build import cythonize
 
 setup(
     name='hexachromix',
-    version='0.2.2',
+    version='0.2.3',
     description='Hexachromix',
     author='Taylor Vance',
     author_email='mirrors.cities0w@icloud.com',
     packages=find_packages(),
     install_requires=[
         'cython<4.0.0',
-        'multimcts==0.6.2',
+        'multimcts==0.6.3',
         'fastapi',
         'uvicorn',
         'psutil',

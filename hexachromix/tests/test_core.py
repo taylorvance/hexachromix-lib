@@ -47,6 +47,35 @@ class TestCore(TestCase):
         self.assertEqual(len(HexachromixState(hfen='ygm/M3/5/4/3 Y MRY').get_legal_moves()), 17)
         self.assertEqual(len(HexachromixState(hfen='Ygm/M3/5/4/3 G MRY').get_legal_moves()), 16)
 
+        hfen = '3/4/5/4/3 R MRY'
+        self.assertEqual(
+            set([
+                HexachromixState(hfen=hfen).make_move(move).hfen
+                for move in HexachromixState(hfen=hfen).get_legal_moves()
+            ]),
+            {
+                'R2/4/5/4/3 Y MRY',
+                '1R1/4/5/4/3 Y MRY',
+                '2R/4/5/4/3 Y MRY',
+                '3/R3/5/4/3 Y MRY',
+                '3/1R2/5/4/3 Y MRY',
+                '3/2R1/5/4/3 Y MRY',
+                '3/3R/5/4/3 Y MRY',
+                '3/4/R4/4/3 Y MRY',
+                '3/4/1R3/4/3 Y MRY',
+                '3/4/2R2/4/3 Y MRY',
+                '3/4/3R1/4/3 Y MRY',
+                '3/4/4R/4/3 Y MRY',
+                '3/4/5/R3/3 Y MRY',
+                '3/4/5/1R2/3 Y MRY',
+                '3/4/5/2R1/3 Y MRY',
+                '3/4/5/3R/3 Y MRY',
+                '3/4/5/4/R2 Y MRY',
+                '3/4/5/4/1R1 Y MRY',
+                '3/4/5/4/2R Y MRY',
+            }
+        )
+
     def test_make_move(self):
         state = HexachromixState(hfen='3/4/5/4/3 R R')
         for _ in range(8): state = state.make_move(state.get_legal_moves()[0])
