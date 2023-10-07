@@ -3,14 +3,21 @@ FROM python:3.10 as build
 RUN pip install cython
 
 WORKDIR /app
-COPY requirements.txt .
+
+# Cythonize first (image layer optimization).
+COPY hexachromix/core.pyx hexachromix/
 COPY setup.py .
-COPY hexachromix/ hexachromix
+RUN python setup.py build_ext --inplace
 
-RUN python setup.py build_ext --inplace && \
-	pip install .
+# Install pip requirements (image layer optimization).
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-#RUN python -m unittest discover -s hexachromix/tests
+# Copy the rest of the source code.
+COPY hexachromix/ hexachromix/
+RUN pip install .
+
+RUN python -m unittest discover -s hexachromix/tests
 
 
 FROM python:3.10-slim

@@ -175,10 +175,10 @@ def render_hfen(hfen:str, show_indices:bool=False):
         return '  '.join(spaces[start:end])
 
     # "border" constants
-    bR = colorize('  __'*3,'R')
+    bR = colorize('  ——'*3,'R')
     bY = colorize('\\','Y')
     bG = colorize('/','G')
-    bC = colorize('  ‾‾'*3,'C')
+    bC = colorize('  ——'*3,'C')
     bB = colorize('\\','B')
     bM = colorize('/','M')
 
