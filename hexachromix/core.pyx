@@ -2,6 +2,8 @@
 # cython: profile=False
 
 import re
+from typing import Tuple, Hashable
+from random import choice
 
 cimport cython
 
@@ -88,18 +90,12 @@ cdef class HexachromixState:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cpdef get_legal_moves(self):
-        cdef unsigned char i, j, k, c, n = 0
+        cdef unsigned char i, j, c, n = 0
         cdef unsigned char[19][2] moves
-        cdef unsigned char[19] board
         for i in range(19):
             c = self.board[i]
             for j in range(4):
                 if c == TRANSFORMATIONS[self.player][j][0]:
-                    for k in range(19): board[k] = self.board[k]
-                    board[i] = TRANSFORMATIONS[self.player][j][1]
-                    if bfs(self.player, board):
-                        # If this is a winning move, pretend it's the only move. Don't waste time on others.
-                        return [(i, board[i])]
                     moves[n] = [i, TRANSFORMATIONS[self.player][j][1]]
                     n += 1
                     break
@@ -119,6 +115,22 @@ cdef class HexachromixState:
 
     cpdef bint has_path(self): return bfs((self.player-1)%6, self.board)
 
+    cpdef Tuple[Hashable,HexachromixState] suggest_move(self):
+        cdef unsigned char i
+        cdef unsigned char[19] board
+
+        moves = self.get_legal_moves()
+        for move in moves:
+            # Make a temp board to check for a path.
+            for i in range(19): board[i] = self.board[i]
+            board[move[0]] = move[1]
+            if bfs(self.player, board):
+                return (move, self.make_move(move))
+
+        # If the above did not return a move, pick one at random.
+        move = choice(moves)
+        return (move, self.make_move(move))
+
     def get_result(self):
         if self.has_path():
             prev = COLORS[(self.player - 1) % 6]
@@ -130,13 +142,13 @@ cdef class HexachromixState:
     def __repr__(self): return self.hfen
 
 
-"""  __  __  __
+"""  ——  ——  ——
    / 00  01  02 \
  / 03  04  05  06 \
 |07  08  09  10  11|
  \ 12  13  14  15 /
    \ 16  17  18 /
-     ‾‾  ‾‾  ‾‾
+     ——  ——  ——
 """
 # 255 is the sentinel value used in bfs to indicate "no more neighbors".
 cdef unsigned char[19][6] ADJACENCIES = [

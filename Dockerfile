@@ -4,14 +4,14 @@ RUN pip install cython
 
 WORKDIR /app
 
-# Cythonize first (image layer optimization).
-COPY hexachromix/core.pyx hexachromix/
-COPY setup.py .
-RUN python setup.py build_ext --inplace
-
 # Install pip requirements (image layer optimization).
 COPY requirements.txt .
 RUN pip install -r requirements.txt
+
+# Cythonize Hexachromix source code (image layer optimization).
+COPY hexachromix/core.pyx hexachromix/
+COPY setup.py .
+RUN python setup.py build_ext --inplace
 
 # Copy the rest of the source code.
 COPY hexachromix/ hexachromix/

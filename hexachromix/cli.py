@@ -100,7 +100,7 @@ def main():
                 moves = state.get_legal_moves()
                 while True:
                     try:
-                        print(render_hfen(state.hfen,True), state.hfen)
+                        print(render_hfen(state.hfen,True,True), state.hfen)
                         idx = int(input(f'Choose an index {[i for i,c in moves]}: '))
                         move = None
                         for m in moves:
@@ -144,34 +144,50 @@ def main():
         stats.print_stats(20)
 
 
-def colorize(txt:str, c:str=None):
-    COLORCODES = {'R':31, 'Y':93, 'G':32, 'C':36, 'B':34, 'M':35}
-    if c in COLORCODES: return f'\033[{COLORCODES[c]}m{txt}\033[0m'
-    if c is None: return ''.join(colorize(x,x.upper()) for x in txt)
+def colorize(txt:str, color=None):
+    FG = {'R':31, 'Y':93, 'G':32, 'C':36, 'B':34, 'M':35}
+    if color in FG: return f'\033[{FG[color]}m{txt}\033[39m'
+    if color is None: return ''.join(colorize(x,x.upper()) for x in txt)
+    return txt
+def emphasize(txt:str, effect:str):
+    BG = {'R':41, 'Y':43, 'G':42, 'C':46, 'B':44, 'M':45}
+    if effect in BG: return f'\033[{BG[effect]}m{txt}\033[49m'
+    if effect == 'bold': return f'\033[1m{txt}\033[22m'
+    if effect == 'invert': return f'\033[7m{txt}\033[27m'
     return txt
 
-def render_hfen(hfen:str, show_indices:bool=False):
-    # Pad right with emdashes.
+def render_hfen(hfen:str, highlight_moves:bool=False, show_indices:bool=False):
+    # Replace the character with the occupying color(s), and pad right with emdashes.
     SPACEMAP = {k:v.ljust(2,'—') for k,v in {
         '-':'',
         'R':'R', 'Y':'Y', 'G':'G', 'C':'C', 'B':'B', 'M':'M',
         'r':'MY', 'y':'RG', 'g':'YC', 'c':'GB', 'b':'CM', 'm':'BR',
     }.items()}
 
-    board = hfen.split()[0]
+    (board, color, _) = hfen.split()
     board = re.sub(r'\d', lambda x: '-'*int(x.group(0)), board).replace('/','')
 
+    def can_play(color, c):
+        return (color=='R' and c in '-rBG') or (color=='Y' and c in '-yMC') or (color=='G' and c in '-gRB') or (color=='C' and c in '-cYM') or (color=='B' and c in '-bGR') or (color=='M' and c in '-mCY')
+
+    spaces = []
     if show_indices:
-        spaces = []
         for i,c in enumerate(board):
             idx = str(i).zfill(2)
             space = SPACEMAP[c]
-            spaces.append(colorize(idx[0],space[0]) + colorize(idx[1],space[1]))
+            space = colorize(idx[0],space[0]) + colorize(idx[1],space[1])
+            if highlight_moves and can_play(color,c):
+                space = emphasize(space,color)
+            spaces.append(space)
     else:
-        spaces = [colorize(SPACEMAP[c]) for c in board]
+        for c in board:
+            space = colorize(SPACEMAP[c])
+            if highlight_moves and can_play(color,c):
+                space = emphasize(space,color)
+            spaces.append(space)
 
-    # "join spaces"
     def js(start,end):
+        # Join spaces.
         return '  '.join(spaces[start:end])
 
     # "border" constants
