@@ -3,7 +3,7 @@ from Cython.Build import cythonize
 
 setup(
     name='hexachromix',
-    version='0.2.4',
+    version='0.2.5',
     description='Hexachromix',
     author='Taylor Vance',
     author_email='mirrors.cities0w@icloud.com',
@@ -21,4 +21,5 @@ setup(
     ext_modules=cythonize([
         Extension('hexachromix.core', ['hexachromix/core.pyx']),
     ]),
+    package_data={'hexachromix': ['core.pyx']},
 )

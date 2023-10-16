@@ -24,6 +24,8 @@ def main():
         'eb2': {'type':float, 'help':'Exploration bias of the second MCTS agent.'},
         'rb2': {'type':float, 'help':'RAVE bias of the second MCTS agent.'},
         'pb2': {'type':float, 'help':'Pruning bias of the second MCTS agent.'},
+        'render-mode': {'choices':['char','dot'], 'help':'What should appear in board spaces?', 'default':'char'},
+        'highlight-moves': {'action':'store_true', 'help':'Highlight legal moves?'},
     }
     def add_args(parser:argparse.ArgumentParser, argnames:list):
         for argname in argnames:
@@ -32,12 +34,30 @@ def main():
     parser = argparse.ArgumentParser(description='Hexachromix MCTS Interface')
     subparsers = parser.add_subparsers(dest='command', help='Sub-command help')
 
-    add_args(subparsers.add_parser('sim', help='Simulate a game using MCTS.'), ['profile','variant','hfen','exploration-bias','rave-bias','pruning-bias','max-iterations','max-time'])
-    add_args(subparsers.add_parser('sim2', help='Simulate a game between two MCTS agents.'), ['profile','hfen','eb1','rb1','pb1','eb2','rb2','pb2','max-iterations','max-time'])
-    add_args(subparsers.add_parser('play', help='Play a game against MCTS AI.'), ['profile','variant','hfen','exploration-bias','rave-bias','pruning-bias','max-iterations','max-time','colors'])
-    add_args(subparsers.add_parser('best', help='Find the best move from a given position.'), ['profile','variant','hfen','exploration-bias','rave-bias','pruning-bias','max-iterations','max-time'])
-    add_args(subparsers.add_parser('tree', help='Visualize the MCTS tree.'), ['profile','variant','hfen','exploration-bias','rave-bias','pruning-bias','max-iterations','max-time'])
-    add_args(subparsers.add_parser('moves', help='Get legal moves from a given position.'), ['profile','hfen','variant'])
+    add_args(
+        subparsers.add_parser('sim', help='Simulate a game using MCTS.'),
+        ['profile','variant','hfen','exploration-bias','rave-bias','pruning-bias','max-iterations','max-time','render-mode','highlight-moves']
+    )
+    add_args(
+        subparsers.add_parser('sim2', help='Simulate a game between two MCTS agents.'),
+        ['profile','hfen','eb1','rb1','pb1','eb2','rb2','pb2','max-iterations','max-time','render-mode','highlight-moves']
+    )
+    add_args(
+        subparsers.add_parser('play', help='Play a game against MCTS AI.'),
+        ['profile','variant','hfen','exploration-bias','rave-bias','pruning-bias','max-iterations','max-time','colors','render-mode','highlight-moves']
+    )
+    add_args(
+        subparsers.add_parser('best', help='Find the best move from a given position.'),
+        ['profile','variant','hfen','exploration-bias','rave-bias','pruning-bias','max-iterations','max-time','render-mode','highlight-moves']
+    )
+    add_args(
+        subparsers.add_parser('tree', help='Visualize the MCTS tree.'),
+        ['profile','variant','hfen','exploration-bias','rave-bias','pruning-bias','max-iterations','max-time','render-mode','highlight-moves']
+    )
+    add_args(
+        subparsers.add_parser('moves', help='Get legal moves from a given position.'),
+        ['profile','hfen','variant','render-mode','highlight-moves']
+    )
 
     args = parser.parse_args()
 
@@ -51,6 +71,8 @@ def main():
     pb = getattr(args,'pruning_bias',0)
     max_iterations = getattr(args,'max_iterations',None)
     max_time = getattr(args,'max_time',None)
+    render_mode = getattr(args,'render_mode')
+    hl_moves = getattr(args,'highlight_moves')
 
     if args.profile:
         import cProfile
@@ -65,11 +87,11 @@ def main():
         def maxmem(): return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024**2)
         mcts = MCTS(eb,rb,pb)
         state = HexachromixState(hfen=hfen)
-        print(render_hfen(state.hfen), state.hfen)
+        print(render_hfen(state.hfen, show_hfen=True, mode=render_mode, highlight_moves=hl_moves))
         n = 0
         while not state.is_terminal():
             state = mcts.search(state, max_iterations=max_iterations, max_time=max_time)
-            print(render_hfen(state.hfen), state.hfen)
+            print(render_hfen(state.hfen, show_hfen=True, mode=render_mode, highlight_moves=hl_moves))
             n += 1
         print(f'\nresult={state.get_result()}')
         t = time.time() - t0
@@ -83,16 +105,16 @@ def main():
         mcts2 = MCTS(args.eb2, args.rb2, args.pb2)
         # mcts3 = MCTS(args.eb3, args.rb3)
         state = HexachromixState(hfen=hfen)
-        print(render_hfen(state.hfen), state.hfen)
+        print(render_hfen(state.hfen, show_hfen=True, mode=render_mode, highlight_moves=hl_moves))
         while not state.is_terminal():
             mcts = {'MRY':mcts1,'GCB':mcts2}[state.get_current_team()]
             state = mcts.search(state, max_iterations=max_iterations, max_time=max_time)
-            print(render_hfen(state.hfen), state.hfen)
+            print(render_hfen(state.hfen, show_hfen=True, mode=render_mode, highlight_moves=hl_moves))
         print(f'\nresult={state.get_result()}')
     elif args.command == "play":
         mcts = MCTS(eb,rb,pb)
         state = HexachromixState(hfen=hfen)
-        print(render_hfen(state.hfen), state.hfen)
+        print(render_hfen(state.hfen, show_hfen=True, mode=render_mode, highlight_moves=hl_moves))
         while not state.is_terminal():
             if state.color not in args.colors:
                 state = mcts.search(state, max_iterations=max_iterations, max_time=max_time)
@@ -100,7 +122,7 @@ def main():
                 moves = state.get_legal_moves()
                 while True:
                     try:
-                        print(render_hfen(state.hfen,True,True), state.hfen)
+                        print(render_hfen(state.hfen, show_hfen=True, mode='index', highlight_moves=True))
                         idx = int(input(f'Choose an index {[i for i,c in moves]}: '))
                         move = None
                         for m in moves:
@@ -113,23 +135,23 @@ def main():
                         break
                     except KeyboardInterrupt: exit()
                     except: pass
-            print(render_hfen(state.hfen), state.hfen)
+            print(render_hfen(state.hfen, show_hfen=True, mode=render_mode, highlight_moves=hl_moves))
         print(state.get_result())
     elif args.command == "best":
         state = HexachromixState(hfen=hfen)
-        print(render_hfen(state.hfen), state.hfen)
+        print(render_hfen(state.hfen, show_hfen=True, mode=render_mode, highlight_moves=hl_moves))
         state = MCTS(eb,rb,pb).search(state, max_iterations=max_iterations, max_time=max_time)
-        print(render_hfen(state.hfen), state.hfen)
+        print(render_hfen(state.hfen, show_hfen=True, mode=render_mode, highlight_moves=hl_moves))
     elif args.command == "tree":
         node = MCTS(eb,rb,pb).search(HexachromixState(hfen=hfen), max_iterations=max_iterations, max_time=max_time, return_type='node').get_parent()
         state = node.get_state()
-        print(render_hfen(state.hfen), state.hfen)
+        print(render_hfen(state.hfen, show_hfen=True, mode=render_mode, highlight_moves=hl_moves))
         print(f'visits:rave={node.get_visits()}:{node.get_rave_visits()} | avg:rave={node.get_avg_reward():.1f}:{node.get_avg_rave_reward():.1f}')
         children = [(move,child) for move,child in node.get_children().items()]
         children = sorted(children, key=lambda x:x[1].score(eb,rb), reverse=True)
         for i,pair in enumerate(children):
             (move, child) = pair
-            if i < 3: print(render_hfen(child.get_state().hfen), child.get_state().hfen)
+            if i < 3: print(render_hfen(child.get_state().hfen, show_hfen=True, mode=render_mode, highlight_moves=hl_moves))
             print(f'  {move} | visits:rave={child.get_visits()}:{child.get_rave_visits()} | avg:rave={child.get_avg_reward():.3f}:{child.get_avg_rave_reward():.3f} | score={child.score(eb,rb):.3f} | uncertainty={child.uncertainty(eb):.3f}')
     elif args.command == "moves":
         state = HexachromixState(hfen=hfen)
@@ -145,46 +167,55 @@ def main():
 
 
 def colorize(txt:str, color=None):
-    FG = {'R':31, 'Y':93, 'G':32, 'C':36, 'B':34, 'M':35}
-    if color in FG: return f'\033[{FG[color]}m{txt}\033[39m'
-    if color is None: return ''.join(colorize(x,x.upper()) for x in txt)
+    FG = {'R':31, 'Y':93, 'G':32, 'C':36, 'B':34, 'M':35, 'K':90}
+    if color in FG:
+        return f'\033[{FG[color]}m{txt}\033[39m'
+    if color is None:
+        try: return ''.join(colorize(x,x.upper()) for x in txt)
+        except: pass
     return txt
+
 def emphasize(txt:str, effect:str):
     BG = {'R':41, 'Y':43, 'G':42, 'C':46, 'B':44, 'M':45}
     if effect in BG: return f'\033[{BG[effect]}m{txt}\033[49m'
     if effect == 'bold': return f'\033[1m{txt}\033[22m'
-    if effect == 'invert': return f'\033[7m{txt}\033[27m'
+    # if effect == 'invert': return f'\033[7m{txt}\033[27m'
     return txt
 
-def render_hfen(hfen:str, highlight_moves:bool=False, show_indices:bool=False):
-    # Replace the character with the occupying color(s), and pad right with emdashes.
-    SPACEMAP = {k:v.ljust(2,'—') for k,v in {
+def render_hfen(hfen:str, *, show_hfen=False, mode:str='char', highlight_moves:bool=False):
+    SPACEMAP = {
         '-':'',
         'R':'R', 'Y':'Y', 'G':'G', 'C':'C', 'B':'B', 'M':'M',
         'r':'MY', 'y':'RG', 'g':'YC', 'c':'GB', 'b':'CM', 'm':'BR',
-    }.items()}
+    }
 
-    (board, color, _) = hfen.split()
+    (board, cur_color, _) = hfen.split()
     board = re.sub(r'\d', lambda x: '-'*int(x.group(0)), board).replace('/','')
 
     def can_play(color, c):
         return (color=='R' and c in '-rBG') or (color=='Y' and c in '-yMC') or (color=='G' and c in '-gRB') or (color=='C' and c in '-cYM') or (color=='B' and c in '-bGR') or (color=='M' and c in '-mCY')
 
+    filler = '—'
     spaces = []
-    if show_indices:
-        for i,c in enumerate(board):
-            idx = str(i).zfill(2)
-            space = SPACEMAP[c]
+    for idx,c in enumerate(board):
+        space = SPACEMAP[c].ljust(2,filler)
+
+        if mode == 'dot':
+            space = ''.join([
+                colorize('●',x) if x!=filler else filler
+                for x in space
+            ])
+        elif mode == 'index':
+            idx = str(idx).zfill(2)
             space = colorize(idx[0],space[0]) + colorize(idx[1],space[1])
-            if highlight_moves and can_play(color,c):
-                space = emphasize(space,color)
-            spaces.append(space)
-    else:
-        for c in board:
-            space = colorize(SPACEMAP[c])
-            if highlight_moves and can_play(color,c):
-                space = emphasize(space,color)
-            spaces.append(space)
+        elif mode == 'char' or True:
+            space = colorize(space)
+
+        if highlight_moves and can_play(cur_color,c):
+            space = emphasize(space,cur_color)
+            space = emphasize(space,'bold')
+
+        spaces.append(space)
 
     def js(start,end):
         # Join spaces.
@@ -205,7 +236,7 @@ def render_hfen(hfen:str, highlight_moves:bool=False, show_indices:bool=False):
         f'|{js(7,12)}|',
         f' {bB} {js(12,16)} {bG}',
         f'   {bB} {js(16,19)} {bG}',
-        f'   {bC}',
+        f'   {bC}' + (' '+hfen if show_hfen else ''),
     ])
 
 
